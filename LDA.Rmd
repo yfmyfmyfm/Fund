@@ -1,0 +1,441 @@
+---
+title: "998 project 2"
+author: "Yifan Mei"
+date: "`r format(Sys.Date(), '%B %d, %Y')`"
+fontsize: 12pt 
+output: pdf_document
+---
+
+
+##Summary
+This paper is discussing how can we predict “output”, as measured by publications and citations, based on specific conditioning factors including:Project size as proxied by total expenditures, Relative portion of funding allocated to faculty, staff, and students, Funding mechanism (competitive, formula, other), Basic vs. applied science proportions, Time since completion, Science area (keywords) based on the data awarded by USDA to researchers at the University of Wisconsin--Madison during the period 2008-2016. 
+
+The main challenge for the project are: How to organize data from 4 different excel tables to put them together; How to deal with the missing data;How to deal with the data values we get from the data base and transform them in.
+Two multiple linear regression models are applied to either publication number or maximium citation number of the projects' publications (we choose max citation number of publication instead of sum of citation numbers because of the high similarity of publications within the same project. It is not reasonable to count the similar papers citation for different times.) over the factors we interested plus two impportant factors that affect publication number and citation number: publication journals' impact factors and the cost of time for each project. The result is as following:
+
+For the publication numbers, we have strong evidence to say that the increase of 1,000,000 us dollar total expenditure is related to the increase of 2 publications, and we have weak evidence to say the more total days spent on the project also leads to increase of publication with 10000 days leader to increase of 1.8 publications. Besides, we have weak evidence to say the interaction of funding mechanisum: NIFA NON FORMULA and other study fields contributes to the increase of publication number. Once these two interacted, it leades to 4.61 publication increase.
+
+For the maximal citation number, we have strong evidence to say that the funding mechanisum: NIFA NON FORMULA and the time since the project ends contributes to the increase of maximium citation number of the project's publiations. For a Nifa non formula mechanism, the max citation is 2.5. For the increase of 100 day the project ends, the max citation increase 1. Meanwhile, we have moderate evidence on the interaction of mechanism NIFA Non furmula and the study field: agriculture and medical and multisubjects that they leads to the decrease of maximium citation number on 25.32, 33.97, 32.06, which means that these field are not attract readers a lot. Besides, we weak evidence to say that 100 more total spend date, 1.131 more the maximium citation.
+
+##Introduction
+
+###Background
+U.S. federal science funding agencies collectively spent between $130 and $180 billion per year during the past decade to support university and private foundation research. Agencies allocate much of this funding to researchers through competitive-grant programs that invite individual researchers and research teams to propose research projects with specific aims, hypotheses, and research methods.
+
+For this specific project, I seeks associate patterns of research output, as measured by publications and citations, with characteristics of researchers, research areas, and funding mechanisms by examining data awarded by USDA to researchers at the University of Wisconsin--Madison during the period 2008-2016. These data are derived exclusively from administrative sources and is part of a larger project involving nearly 50 major research universities and covering all major U.S. funding agencies. Additional background on this (UMETRICS) project can be found at the website for the Institute for Research on Innovation and Science (IRIS) at the University of Michigan, and at the related Innovation Measurement Initiative website of the U.S. Census Bureau.
+
+We derive our data from four sources as outlined in the following tables. The USDA maintains a publicly accessible database of all their funded research projects (past and current), and the University of Wisconsin—Madison assembles data on a quarterly basis that it submits to IRIS for the UMETRICS project. Additionally, we searched the references databases Scopus and the Web of Science (available to campus students, faculty, and staff) for each publication that references a project in the set of USDA funded project at the UW. Information about each publication are contained in the relevant tables. 
+
+###Main Questions
+
+The primary question is, How can we predict “output”, as measured by publications and citations, based on specific conditioning factors including:
+Project size as proxied by total expenditures
+Relative portion of funding allocated to faculty, staff, and students
+Funding mechanism (competitive, formula, other)
+Basic vs. applied science proportions
+Time since completion
+Science area (keywords)
+
+###Main Challenges
+The main challenge for the project are:
+How to organize data from 4 different excel tables to put them together
+How to deal with the missing data
+How to deal with the data values we get from the data base and transform them in 
+
+
+```{r setup, include=FALSE}
+##2018.02.15 is the end for citation
+##active vs end data???? 只看结束时间 把剩下的给改了
+##prediction publication vs 6 factors
+##focus on usda but data is small
+##罗兰什么意思？？？？？
+##hard to define match and liballing rule
+```
+
+
+##Data Process
+Firstly, by using same doi and assession number for each project or publication, I merge the 4 excel files provided by the client together.
+
+Then, I did a time transformation: I merged the 2 types of dates: projects' start dates and projects' end dates to projects' costs of dates. Considering the time effect to numbers of citition, I also calculated the differences between the projects' end dates and our data collected date as a factor named "time for citing". By calculating the difference between end date and data collected date, we also do not need the variable: "project status", because it is the same as "time for citing".
+
+```{r, echo = F}
+# alldata$spenddate = as.Date(alldata$prj_end)-as.Date(alldata$prj_start)
+# 
+# alldata$fromnowon = as.Date("2018-02-15")-alldata$prj_end
+# 
+# alldata$date = NULL
+# alldata$prj_start=NULL
+# alldata$prj_end=NULL
+# alldata$prj_status =NULL
+```
+
+
+Now, I get a first version of full data. however, there are a lot of missing data here. One type of missing data needed to be think at first: missing values for title for publications. If the titles for publication are missing, it is impossible for anyone to figure out what exactly they are and whether they really existed. In this way, the lines where the title of publication is missing are deleted. Besides, considering the same meaning of 2 factors: number of authors and authors, I merged the authors for publications with number of authors together into number of authors and delete authors of publications.
+
+
+```{r, echo = FALSE}
+#delete all missing values for title for publications
+
+# while (sum(is.na(alldata$title))!= 0) {
+#   i = dim(alldata)[1]
+#   while (i>0) {
+#     if (is.na(alldata$title[i])) {
+#       alldata = alldata[-i,]
+#       i = i-1
+#     }
+#     i = i-1
+#   }
+# }
+# 
+# #nlevels(as.factor(alldata$accession_number))
+# 
+# #alldata = alldata[order(alldata$project_title),]
+# 
+# 
+# author = alldata$authors
+# count = rep(0,length(author))
+# 
+# for (i in 1:length(author)) {
+#   #if (!is.na(author)) {
+#   ss = strsplit(author[i], split = ";")
+#   if (!is.na(ss[[1]][1])) {
+#     count[i] = length(ss[[1]])
+#   }
+# }
+# 
+# for (i in 1:length(author)) {
+#   if (is.na(alldata$num_authors[i])) {
+#     alldata$num_authors[i] = max(count[i])
+#   }
+# }
+# 
+# count = c()
+# for (i in 1:length(alldata)) {
+#   count[i] = sum(is.na(alldata[,i]))
+# }
+# names(count) = names(alldata)
+# 
+# alldata$authors = NULL
+```
+
+
+Besides, I delete all lines that the expenditures are negative because they are not reasonable.
+
+```{r, echo = F}
+# while (sum(alldata$total_expenditures<0) != 0) {
+#   i = dim(alldata)[1]
+#   while (i >0) {
+#     if (alldata$total_expenditures[i] < 0) {
+#       alldata = alldata[-i,]
+#       i = i+1
+#     }
+#     i = i-1
+#   }
+# }
+
+
+#ad = write.csv(alldata3, "ad3.csv")
+```
+
+
+Then, after observing the data, I find out that for the publishments under the same project, the contents are quite similar, thus counting each published journal or book's citation number for the same porject is not reasonable. Instead, I use the publishment with max citation for each project, and count the number of publishment for each project. Besides, I used the 2017 journal ranks listed on http://www.scimagojr.com/journalrank.php?year=2017 as the impact factors for the max citation paper in each project.
+
+
+```{r, echo =F}
+# i = dim(alldata)[1]
+# while (i>0) {
+#   if (is.na(alldata$pct_basic_research[i])&is.na(alldata$pct_applied_research[i])&is.na(alldata$pct_develop_research[i])) {
+#     alldata = alldata[-i,]
+#     i = i-1
+#   }
+#   i = i-1
+# }
+# sum(is.na(alldata3$pct_basic_research)&is.na(alldata3$pct_applied_research)&is.na(alldata3$pct_develop_research))
+# 
+#calculate alldata's project number
+
+
+# alldata = alldata[order(alldata$accession_number),]
+# #write.csv(alldata, "ad.csv")
+# alldata2=alldata[order(alldata$accession_number,-alldata$num_citations),]
+# alldata3=alldata2[!duplicated(alldata2$accession_number),]
+# 
+# count = c()
+# for (i in 1:length(alldata3)) {
+#   count[i] = sum(is.na(alldata3[,i]))
+# }
+# names(count) = names(alldata3)
+# 
+# alldata3 = alldata3[order(alldata3$accession_number),]
+# 
+# #write.csv(alldata3, "ad3.csv")
+# alldata4 = read.csv("ad3.csv", header = T, stringsAsFactors = FALSE)
+# 
+# alldata3$publicname = alldata4$publication_number[-length(alldata4$publication_number)]
+# alldata3$impactfactor = alldata4$impactfactor[-length(alldata4$impactfactor)]
+# 
+# 
+# #write.csv(alldata3,"ad3subject.csv")
+```
+
+
+
+Now, it is time to classify the subjects. I use a very powerful package named text2vec in R. It automatically splits all subjects into single words and build a vocabulary database based onthese single words except useless words: "AND", "&", "SCIENCE", "SCIENCES", "TECHNOLOGY", "TECHNOLOGIES", "ALL", "(", ")", ",", ";", "APPLIED", "STUDIES", "SMALL. Then, I got the top 30 words that appears most times (See Appendix Figure1). Then, I merge the top 50 words into 6 types: biology, agriculture, medical, animal, ecology, multisubjects, other. 
+
+
+```{r, echo = F}
+# prep <- function(x) {
+#     x %>%
+#         str_replace_all("[^[:alpha:]]", " ") %>%
+#         str_replace_all("\\s+", " ")
+# }
+# 
+# tokens <- alldata$subjects %>%
+#     prep %>%
+#     word_tokenizer
+# 
+# it <- itoken(tokens)
+# stopword = c("AND", "&", "SCIENCE", "SCIENCES", "TECHNOLOGY", "TECHNOLOGIES", "ALL", "(", ")", ",", ";", "APPLIED", "STUDIES", "SMALL")
+# v <- create_vocabulary(it, ngram = c(1L, 1L), stopwords = stopword)
+# vectorizer <- vocab_vectorizer(v)
+# 
+# t1 = Sys.time()
+# dtm <- create_dtm(it, vectorizer, type = "dgTMatrix")
+# print(difftime(Sys.time(), t1, units = 'sec'))
+# 
+# saveRDS(dtm, file = "dtm.rds")
+# 
+# lda_mode <- LDA$new(n_topics = 50, doc_topic_prior = 0.1,
+#                     topic_word_prior = 0.01)
+# 
+# doc_topic_distr <- lda_mode$fit_transform(x = dtm, n_iter = 2000,
+#                                           covergence_tol = 0.0001, n_check_convergence = 50)
+# lda_mode$plot(out.dir = "LDA_topic")
+```
+
+Now, before I can do analysis about the data, I deal with the missing values in the dataset. One type of missing data should be dealed with at first: the missing data in factors "pct_basic_research" (basic research rate), "pct_applied_research"(applied research rate), and "pct_develop_research"(developed research), because the sum of these three vectors are 100%. Thus, I use random number on the range of 0% to 100% to generate the rate of basic research for the missing values, and then I use the random number on the range of 0% to the difference of 100% and the repaired missing values in basic research rate to generate the applied research rate. Then, the developed research rate is 100% - repaired missing values in basic research rate - repaired missing values in applied research rate. Then, a method named Multiple Imputation is used for all the rest of missing value. The strength for this method is that, comparing to traditional simple methods of dealing with missing data: omitting them, use mode or median or mean of the total factor as the value of missing data, it imputes the missing entries of the incomplete data sets, not once, but m (number of each vector) times. In this way, imputed values are drawn for a distribution. In this way, the missing values can be "repaired" differently. for each missing entry)
+
+
+```{r, echo = F, warning=FALSE, message=FALSE, results = 'hide'}
+library(ggplot2)
+require(grid)
+library(ggplot2)
+library(Rmisc)
+library(lattice)
+library(plyr)
+ad3subject = read.csv("ad3subject.csv", header = T, stringsAsFactors = F)
+ad3subject$impactfactor = as.numeric(ad3subject$impactfactor)
+
+for (i in 1:dim(ad3subject)[1]) {
+  if (!is.na(ad3subject$pct_basic_research[i]) | !is.na(ad3subject$pct_applied_research[i]) | !is.na(ad3subject$pct_develop_research[i])) {
+    v3 = c(ad3subject$pct_basic_research[i], ad3subject$pct_applied_research[i], ad3subject$pct_develop_research[i])
+    v3[is.na(v3)] = 0
+    ad3subject$pct_basic_research[i] = v3[1]
+    ad3subject$pct_applied_research[i] = v3[2]
+    ad3subject$pct_develop_research[i] = v3[3]
+  } else {
+    ad3subject$pct_basic_research[i] = round(100*runif(1))
+    ad3subject$pct_applied_research[i] = round((100-ad3subject$pct_basic_research[i])*runif(1))
+    ad3subject$pct_develop_research[i] = 100-ad3subject$pct_basic_research[i]-ad3subject$pct_applied_research[i]
+  }
+}
+
+library(mice)
+nona1 = ad3subject
+
+pred1=matrix(0,27,27)
+diag(pred1)=1
+colnames(pred1)=colnames(nona1)
+
+nonamerge1=mice(nona1,m=1, maxit=5, method='pmm',predictorMatrix = pred1)
+
+nn1=complete(nonamerge1)
+
+count33 = c()
+for (i in 1:length(nn1)) {
+  count33[i] = sum(is.na(nn1[,i]))
+}
+names(count33) = names(nn1)
+
+
+nn1$impactfactor  = as.factor(nn1$impactfactor)
+
+
+
+for (i in 1:dim(nn1)[1]) {
+  totalnum= nn1$num_faculty[i]+nn1$num_other[i]+nn1$num_students[i]
+  nn1$faucultyrate[i] = nn1$num_faculty[i]/totalnum
+  nn1$otherrate[i] = nn1$num_other[i]/totalnum
+}
+
+
+
+nn1$funding_mechanism = as.factor(nn1$funding_mechanism)
+final = nn1[,c(25,26,18, 27, 10, 24, 23, 3, 6,7,28,29)]
+names(final) = c("publication number", "journal's impactfactor","max num of citations", "study field", "total expenditures", "time since it end", "total spend dates", "funding mechanism", "ratio of basic research", "ratio of applied research", "ratio of fauculty", "ratio of staff")
+
+final$`study field` = factor(final$`study field`, levels = c("1", "2", "3", "4", "6", "7", "8"),labels = c("biology","agriculture", "medical","animal","ecology","multisubjects", "other"))
+final$`journal's impactfactor` = as.numeric(as.character(final$`journal's impactfactor`))
+
+final1 = final[,-c(3)]
+final2 = final[,-c(1)]
+```
+
+
+
+
+```{r, echo = F}
+# par(mfrow = c(1,2))
+# plot(`publication number`~`journal's impactfactor`, data = final)
+# plot(`max num of citations`~`journal's impactfactor`, data = final)
+
+```
+
+
+##Basic Analysis about the factors we are interested in
+After a long way, we finally get a clear version of data without any missing data, and we can take a brief look about the simple relationship of factors we interested toward the publication number and the maximium citation number. The analytic plots are listed as below:
+
+
+```{r, echo = F, fig.cap = "The scatterplots of total expenditures over publication number and citation number. Most expenditures are less than 1,000,000. The expenditure over 2,000,000 does not contribute to high publication directly to both publication number and citation number"}
+par(mfrow = c(1,2))
+plot(`publication number`~`total expenditures`, data = final)
+plot(`max num of citations`~`total expenditures`, data = final)
+
+```
+
+
+
+```{r, echo = F, fig.cap = "The scatterplos of time between end data of project and the data collected date toward the publication number and citations. The time between end data of project and the data collected date does not contribute obviously to the publication number, but a little bit contribution to the increase of max citation number. The total time a project spend does has upper trend to the publication number and the citation number"}
+par(mfrow = c(2,2))
+plot(`publication number`~`time since it end`, data = final)
+plot(`max num of citations`~`time since it end`, data = final)
+plot(`publication number`~`total spend dates`, data = final)
+plot(`max num of citations`~`total spend dates`, data = final)
+```
+
+
+
+
+```{r, echo = F, fig.cap="The scatterplots of research rate (basic, applied) towards publication number and maximium citation. There is no obvious pattern for eith basic or applied research rate toward either publication number or maximium citation.", figure.height = 10, figure.width = 12}
+par(mfrow = c(1,2))
+final$`basic research rate` = final$`ratio of basic research`/100
+final$`applied research rate` = final$`ratio of applied research`/100
+plot(`publication number`~`basic research rate`, data = final, main = "research rate")
+points(final$`applied research rate`, final$`publication number`, col = 2, pch = 3)
+plot(`max num of citations`~`basic research rate`, data = final, main = "research rate")
+points(final$`applied research rate`, final$`max num of citations`, col = 2, pch = 3)
+
+
+
+```
+
+```{r, echo = F, fig.cap = "The scatterplots of the the ratio of faculty and the the ratio of staff over publication number and max citation number"}
+par(mfrow = c(1,2))
+plot(`publication number`~`ratio of fauculty`, data = final, xlim = c(0,1), main = "ratio of member")
+points(final$`ratio of staff`, final$`publication number`, col = 2, pch = 3)
+plot(`max num of citations`~`ratio of fauculty`, data = final, xlim = c(0,1), main = "ratio of member")
+points(final$`ratio of staff`, final$`max num of citations`, col = 2, pch = 3)
+```
+
+```{r, echo = F, fig.cap = "journal's impact factor over publication number and citation number. The impact factor gathers below 300. Around 200 impact number has largest citation. "}
+par(mfrow = c(1,2))
+plot(`publication number`~`journal's impactfactor`, data = final)
+plot(`max num of citations`~`journal's impactfactor`, data = final)
+
+```
+
+```{r, echo = F, fig.cap="Boxplots for funding mechanisum over publication number and maximium citation number. According to the boxplot for funding mechanisum over publication number and maximium citation number, we can see nearly the same median but subtle difference of shape between two mechanisums over both publication number and maximium citation number. "}
+par(mfrow = c(1,2))
+
+p1 = ggplot(final, aes(x=`funding mechanism`, y=`publication number`)) + geom_boxplot()+theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5))
+p2 = ggplot(final, aes(x=`funding mechanism`, y=`max num of citations`))+geom_boxplot()+theme(axis.text.x = element_text(angle = 45, hjust = 0.5, vjust = 0.5))
+p3 = ggplot(final, aes(x=`study field`, y=`publication number`, col = `study field`)) + geom_boxplot()+theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5))
+p4 = ggplot(final, aes(x=`study field`, y=`max num of citations`, col = `study field`)) + geom_boxplot()+theme(axis.text.x = element_text(angle = 90, hjust = 0.5, vjust = 0.5))
+multiplot(p1,p2,cols = 2)
+
+```
+
+
+```{r, echo = F, fig.cap = "Boxplots for study fields over publication number and maximium citation number. Comparing the boxplot for study field over publication number and maximium citation number, we can see obvious differences of study fields over the maximium citation number, and slightly diferrences of study fields over publication number"}
+multiplot(p3,p4,cols = 2)
+
+
+```
+
+
+
+```{r, echo =  F, fig.cap="Interaction plot of funding mechanisum and study fields. Based on the interaction plot, we can see interaction effect for nearly all study fields to the funding mechanisums except the animal field"}
+
+  ggplot(final) +
+  aes(x = `funding mechanism`, y = `publication number`, color = `study field`, group = `study field`) +
+  stat_summary(fun.y = mean, geom = "point") +
+  stat_summary(fun.y = mean, geom = "line")
+```
+
+
+##Final Model
+
+After I see the simple relationships between the outputs, publication numbers and citation numbers to the 6 interested variables, I think it is reasonable to use multiple linear regression model to detect the relationships among them in general because of some linear relationships for the simple models. Besides, considering the potential impact on the reputation of projects' published journals and the dates the project spend, I think it is reasonable to add these two terms together into the regression model. Besides, according to the result of interaction plot, there does exist interaction effect between the study effect and the funding mechanism, thus, the interaction term is also added to the regression.
+
+The results are listed as following:
+
+```{r, echo = F}
+
+lm1 = lm(`publication number`~`journal's impactfactor`+`study field`+`total expenditures`+`time since it end`+         `total spend dates`+`funding mechanism`+`ratio of basic research`+`ratio of applied research`+`ratio of fauculty`+`ratio of staff`+ `funding mechanism`*`study field`, data = final1)
+lm2 = lm(`max num of citations`~`journal's impactfactor`+`study field`+`total expenditures`+`time since it end`+         `total spend dates`+`funding mechanism`+`ratio of basic research`+`ratio of applied research`+`ratio of fauculty`+`ratio of staff`+ `funding mechanism`*`study field`, data = final2)
+
+sum1 = summary(lm1)
+
+sum2 = summary(lm2)
+
+library(knitr)
+library(kableExtra)
+options(knitr.table.format = "latex") 
+kable(sum1$coefficients, format = "latex", booktabs = T, caption = "Multiple linear regression model based for publication number over journal's impactfactor, study field, total expenditures, time since it end, total spend dates, funding mechanism, ratio of basic research, ratio of applied research, ratio of fauculty, ratio of staff. Based on the model, we have strong evidence to say that the increase of 1,000,000 us dollar total expenditure is related to the increase of 2 publications, and we have weak evidence to say the more total days spent on the project also leads to increase of publication with 10000 days leader to increase of 1.8 publications. Besides, we have weak evidence to say the interaction of funding mechanisum: NIFA NON FORMULA and other study fields contributes to the increase of publication number. Once these two interacted, it leades to 4.61 publication increase.") %>%
+kable_styling(latex_options = "scale_down")
+
+library(knitr)
+library(kableExtra)
+options(knitr.table.format = "latex") 
+kable(sum2$coefficients, format = "latex", booktabs = T, caption = "Multiple linear regression model based for max num of citations over journal's impactfactor, study field, total expenditures, time since it end, total spend dates, funding mechanism, ratio of basic research, ratio of applied research, ratio of fauculty, ratio of staff. According to the result, we have strong evidence to say that the funding mechanisum: NIFA NON FORMULA and the time since the project ends contributes to the increase of maximium citation number of the project's publiations. For a Nifa non formula mechanism, the max citation is 2.5. For the increase of 100 day the project ends, the max citation increase 1. Meanwhile, we have moderate evidence on the interaction of mechanism NIFA Non furmula and the study field: agriculture and medical and multisubjects that they leads to the decrease of maximium citation number on 25.32, 33.97, 32.06, which means that these field are not attract readers a lot. Besides, we weak evidence to say that 100 more total spend date, 1.131 more the maximium citation.") %>%
+kable_styling(latex_options = "scale_down")
+
+
+
+```
+
+
+
+```{r, echo = F}
+# 
+
+
+
+
+```
+
+
+
+```{r, echo =F}
+# 
+
+```
+
+
+##Conclusion
+
+Based on the regression results, we find out that the factors that matters the publication numbers are not the same as the factors that matters the maximium citation number. 
+
+For the publication numbers, we have strong evidence to say that the increase of 1,000,000 us dollar total expenditure is related to the increase of 2 publications, and we have weak evidence to say the more total days spent on the project also leads to increase of publication with 10000 days leader to increase of 1.8 publications. Besides, we have weak evidence to say the interaction of funding mechanisum: NIFA NON FORMULA and other study fields contributes to the increase of publication number. Once these two interacted, it leades to 4.61 publication increase.
+
+For the maximal citation number, we have strong evidence to say that the funding mechanisum: NIFA NON FORMULA and the time since the project ends contributes to the increase of maximium citation number of the project's publiations. For a Nifa non formula mechanism, the max citation is 2.5. For the increase of 100 day the project ends, the max citation increase 1. Meanwhile, we have moderate evidence on the interaction of mechanism NIFA Non furmula and the study field: agriculture and medical and multisubjects that they leads to the decrease of maximium citation number on 25.32, 33.97, 32.06, which means that these field are not attract readers a lot. Besides, we weak evidence to say that 100 more total spend date, 1.131 more the maximium citation.
+
+##Reference
+
+Distributed Representations of Words and Phrases and their Compositionality; Tomas Mikolov, Ilya Sutskever, Kai Chen, Greg Corrado, Jeffrey Dean; comhttps://arxiv.org/pdf/1310.4546.pdf
+
+Journal Ranking level http://www.scimagojr.com/journalrank.php?year=2017
+
+##Appendix
+![Top 30 key words among the subjects of the projects. ](subjects.png)
+
